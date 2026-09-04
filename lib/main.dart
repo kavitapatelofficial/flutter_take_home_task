@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -31,14 +33,43 @@ class _Bootstrap extends StatefulWidget {
   State<_Bootstrap> createState() => _BootstrapState();
 }
 
-class _BootstrapState extends State<_Bootstrap> {
+class _BootstrapState extends State<_Bootstrap> with WidgetsBindingObserver {
   AppServices? _services;
   Object? _error;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _boot();
+  }
+
+  /// Settle the database whenever the app leaves the foreground.
+  ///
+  /// Android will kill a backgrounded process without warning, and DuckDB
+  /// replays its write-ahead log on the next open. Checkpointing here is the
+  /// difference between relaunching into a settled file and relaunching into
+  /// a couple of seconds of WAL replay -- measured, on a device, at 7 MB of
+  /// WAL after a force-stop mid-simulation.
+  ///
+  /// The simulator is paused too: there is nothing to watch it, and a
+  /// background process writing telemetry nobody asked for is just battery.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final services = _services;
+    if (services == null) return;
+
+    switch (state) {
+      case AppLifecycleState.paused:
+      case AppLifecycleState.detached:
+      case AppLifecycleState.hidden:
+        services.simulator.stop();
+        unawaited(services.checkpoint());
+      case AppLifecycleState.resumed:
+        services.simulator.start();
+      case AppLifecycleState.inactive:
+        break;
+    }
   }
 
   Future<void> _boot() async {
@@ -57,6 +88,7 @@ class _BootstrapState extends State<_Bootstrap> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _services?.dispose();
     super.dispose();
   }

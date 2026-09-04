@@ -306,6 +306,7 @@ not a different dice roll.
 | RSS delta across opening the db + 500 rows | **3.2 MB** (408.6 MB total) |
 | Database file | 43.8 MB |
 | Derived | 14,491 crossings, 7,246 trips, 108 alerts |
+| App launch to first frame (profile build) | **1.7 – 2.0 s** |
 
 ### Host: M-series macOS, DuckDB 1.2.1
 
@@ -328,17 +329,40 @@ magic.** 8 ms at p50 over 2.6M stored rows is what you get for reading a
 500-row projection instead of the log. The p95 of 17 ms is emulator noise —
 other tenants on a shared machine — not a different code path.
 
-**Cold start is 341 ms for the database, but app launch is not.** A debug build
-measures ~4.8–5.5 s to first frame (`am start -W`), of which ~3.7 s is our own
-boot. That is JIT warm-up, not the database: the same open takes 341 ms in an
-already-running process. Debug numbers overstate startup badly and are reported
-here as debug numbers.
+**Cold start needed two fixes, and measuring found both.**
 
-Measuring this found a real bug. Startup was calling the geofence list, whose
-vehicle counts pivoted *every position row the app had ever stored* — a
-three-second full-history scan on every launch. The current-position query now
-reads the projection instead of the log, and the seed check counts rows instead
-of asking for the list. That is the kind of thing a benchmark is for.
+| Launch to first frame (`am start -W`) | Of which: our boot | |
+|---|---|---|
+| 4.8 – 5.5 s | 3.7 s | debug build, before fixes |
+| 3.2 – 3.4 s | 2.1 – 2.3 s | profile build, before fixes |
+| **1.7 – 2.0 s** | **0.9 – 1.1 s** | profile build, after both fixes |
+
+The first bug: startup called the geofence list to decide whether to seed, and
+that list computes vehicle counts, which resolved every vehicle's position by
+pivoting *every position row the app had ever stored*. A full-history scan on
+every launch. The current-position query now reads the `latest_readings`
+projection instead of the log — proportional to the fleet, not to its history —
+and the seed check counts rows rather than asking for the list.
+
+The second was more interesting. Startup was still ~2 s in a profile build,
+while the same database open took 341 ms inside an already-running process.
+Looking at the app's files explained it: a **7 MB write-ahead log**, left behind
+because Android had force-stopped the process mid-write and DuckDB replays its
+WAL on open. The app now checkpoints when it is backgrounded
+(`didChangeAppLifecycleState`), which takes ~600 ms off the main thread at a
+moment when nobody is looking, and leaves the WAL at ~100 KB instead of 14 MB.
+Launch dropped from ~3.3 s to ~1.8 s.
+
+Neither of these is visible by reading the code. The first looks like a cheap
+existence check and the second looks like nothing at all.
+
+Two caveats on these figures. They are a profile build, not release, and the
+database is the ~23 MB one the simulator builds rather than the 44 MB backfill
+— the 341 ms cold-open figure above is measured against the full backfill and
+is the better number for the database layer specifically. The remaining ~1 s of
+boot is DuckDB opening the file plus roughly sixteen schema statements, each of
+which is its own round trip to the database isolate; batching those into one
+call is the obvious next thing to try.
 
 **Derivation is the slow part, and I would fix it next.** 16.5 s to replay 500
 vehicles is fine as a one-off backfill and fine for live ingest — a packet from

@@ -113,8 +113,36 @@ class AppServices {
     }
   }
 
+  /// Folds the write-ahead log into the database file.
+  ///
+  /// DuckDB replays the WAL when it opens, so a process killed mid-write pays
+  /// for that replay on the next launch. With the simulator running, a
+  /// force-stopped app left a 7 MB WAL behind and startup spent ~2 s replaying
+  /// it before it could answer anything. Checkpointing when the app is
+  /// backgrounded means the next launch opens a settled file.
+  ///
+  /// Best-effort: if the database is busy or already closing, a failed
+  /// checkpoint costs a slower start, not correctness, so it must never take
+  /// the app down on the way out.
+  Future<void> checkpoint() async {
+    final watch = Stopwatch()..start();
+    try {
+      await db.execute('CHECKPOINT');
+      // Only worth a line when it actually cost something; an in-memory
+      // database checkpoints in no time and does not need announcing.
+      if (watch.elapsedMilliseconds > 50) {
+        debugPrint('checkpoint: folded the WAL in '
+            '${watch.elapsedMilliseconds} ms');
+      }
+    } catch (error) {
+      debugPrint('checkpoint: failed after ${watch.elapsedMilliseconds} ms: '
+          '$error');
+    }
+  }
+
   Future<void> dispose() async {
     simulator.stop();
+    await checkpoint();
     await pipeline.dispose();
     await db.close();
   }
