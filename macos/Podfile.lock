@@ -1,0 +1,22 @@
+PODS:
+  - dart_duckdb (1.4.4):
+    - FlutterMacOS
+  - FlutterMacOS (1.0.0)
+
+DEPENDENCIES:
+  - dart_duckdb (from `Flutter/ephemeral/.symlinks/plugins/dart_duckdb/macos`)
+  - FlutterMacOS (from `Flutter/ephemeral`)
+
+EXTERNAL SOURCES:
+  dart_duckdb:
+    :path: Flutter/ephemeral/.symlinks/plugins/dart_duckdb/macos
+  FlutterMacOS:
+    :path: Flutter/ephemeral
+
+SPEC CHECKSUMS:
+  dart_duckdb: 6a936ac1b53b289b5bc879bae2627dedaa3c0524
+  FlutterMacOS: d0db08ddef1a9af05a5ec4b724367152bb0500b1
+
+PODFILE CHECKSUM: 54d867c82ac51cbd61b565781b9fada492027009
+
+COCOAPODS: 1.16.2
