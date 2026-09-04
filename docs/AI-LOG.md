@@ -160,6 +160,21 @@ breaks *device* builds, and a framework that fundamentally cannot load on a
 simulator. Reporting only the first would have sent someone chasing a fix that
 could never work.
 
+**Web is impossible, not merely unsupported.** `flutter run -d chrome` failed
+with hundreds of "Only JS interop members may be 'external'" errors from
+`duckdb.g.dart`. The tempting read is that our own `dart:io` imports forced the
+FFI path and that guarding them would fix it.
+
+Checking the package first showed that is wrong: 1.2.2's `dart_duckdb.dart`
+exports `src/ffi/duckdb_ffi.dart` with no `if (dart.library.io)` guard, and
+there is no `src/web/` directory to fall back to. The bindings compile on every
+platform whatever we do. 1.4.x does have the conditional export and a web
+implementation — but 1.4.x cannot build for Android, so there is no version
+that does both.
+
+That turned a plausible afternoon of conditional-import surgery into a
+two-minute answer plus a deleted `web/` folder.
+
 **The emulator ran out of disk.** The existing Pixel 7 AVD had 537 MB free with
 other projects' apps installed. Rather than delete someone else's apps, a
 dedicated `Bench_Pixel7_API36` AVD was created with a 12 GB data partition.

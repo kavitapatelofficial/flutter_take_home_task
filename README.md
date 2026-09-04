@@ -24,8 +24,23 @@ simulator that fills the fleet in over the first few seconds. For the full
 |---|---|
 | macOS | Works. Verified. |
 | Android | Works. All device measurements below are from a Pixel 7 API 36 emulator. |
+| Linux / Windows | Should work; **unverified**. `dart_duckdb` ships binaries for both. |
 | iOS device | Should work; **unverified** — no physical device available. |
 | **iOS Simulator** | **Does not work.** Upstream limitation, see below. |
+| **Web** | **Not supported.** The `web/` scaffold has been removed. |
+
+Web is not a "not yet" — it is impossible with this dependency.
+`dart_duckdb` 1.2.2 exports its `dart:ffi` bindings *unconditionally*, with no
+`dart.library.io` guard and no web implementation behind it, so dart2js is
+handed thousands of `external` struct members it cannot compile. The 1.4 line
+does have a conditional web export, but 1.4 cannot build for Android at all
+(see below), so no single version does both.
+
+Even if it compiled, web DuckDB is a different engine — duckdb-wasm, with OPFS
+or IndexedDB underneath instead of a file — which is a different persistence
+story than the one this exercise is about. The default `web/` directory was
+deleted so the toolchain stops offering a target that can never build; `git
+revert` brings it back if that changes.
 
 `dart_duckdb` ships a **device-only** iOS framework. Every published release
 back to 1.0.1 contains a single `arm64` slice tagged `LC_VERSION_MIN_IPHONEOS`
