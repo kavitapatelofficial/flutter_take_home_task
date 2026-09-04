@@ -151,6 +151,12 @@ class VehicleRepository {
     final now = _clock.nowUtc();
     final from = now.subtract(window);
 
+    // Bucket width chosen so a full window lands near maxPoints. A sparkline
+    // 300 pixels wide gains nothing from 5000 points and costs a lot to
+    // marshal across the isolate boundary. Interpolated rather than bound
+    // because DuckDB will not take a parameter inside an interval constructor.
+    final bucketSeconds = (window.inSeconds / maxPoints).ceil();
+
     final rows = await _db.select('''
       WITH points AS (
         SELECT event_time, value
@@ -164,27 +170,18 @@ class VehicleRepository {
       ),
       bucketed AS (
         SELECT
-          time_bucket(INTERVAL (? ) SECOND, event_time) AS bucket,
+          time_bucket(INTERVAL $bucketSeconds SECOND, event_time) AS bucket,
           arg_max(value, event_time) AS value,
-          max(event_time) AS at
+          max(event_time) AS bucket_at
         FROM points
         GROUP BY bucket
       )
-      SELECT at, value FROM bucketed ORDER BY at
-    ''', [
-      vehicleId,
-      from,
-      vehicleId,
-      from,
-      // Bucket width chosen so a full window lands near maxPoints. A sparkline
-      // 300 pixels wide gains nothing from 5000 points and costs a lot to
-      // marshal across the isolate boundary.
-      (window.inSeconds / maxPoints).ceil(),
-    ]);
+      SELECT bucket_at, value FROM bucketed ORDER BY bucket_at
+    ''', [vehicleId, from, vehicleId, from]);
 
     return [
       for (final row in rows)
-        HistoryPoint(row['at'] as DateTime, row['value'] as double),
+        HistoryPoint(row['bucket_at'] as DateTime, row['value'] as double),
     ];
   }
 
