@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'app/app.dart';
 import 'app/providers.dart';
 import 'app/services.dart';
+import 'app/startup_failure.dart';
 
 Future<void> main() async {
   // Started before anything else so the cold-start figure on the Diagnostics
@@ -35,7 +36,7 @@ class _Bootstrap extends StatefulWidget {
 
 class _BootstrapState extends State<_Bootstrap> with WidgetsBindingObserver {
   AppServices? _services;
-  Object? _error;
+  StartupFailure? _error;
 
   @override
   void initState() {
@@ -82,7 +83,7 @@ class _BootstrapState extends State<_Bootstrap> with WidgetsBindingObserver {
       services.simulator.start();
       if (mounted) setState(() => _services = services);
     } catch (error) {
-      if (mounted) setState(() => _error = error);
+      if (mounted) setState(() => _error = StartupFailure.from(error));
     }
   }
 

@@ -5,8 +5,8 @@ import '../ui/alerts/alerts_screen.dart';
 import '../ui/diagnostics/diagnostics_screen.dart';
 import '../ui/fleet/fleet_screen.dart';
 import '../ui/geofences/geofences_screen.dart';
-import '../ui/widgets/common.dart';
 import 'providers.dart';
+import 'startup_failure.dart';
 
 class FleetConsoleApp extends StatelessWidget {
   const FleetConsoleApp({super.key});
@@ -118,7 +118,7 @@ class _ShellState extends ConsumerState<_Shell> {
 class BootScreen extends StatelessWidget {
   const BootScreen({super.key, this.error});
 
-  final Object? error;
+  final StartupFailure? error;
 
   @override
   Widget build(BuildContext context) => MaterialApp(
@@ -127,11 +127,68 @@ class BootScreen extends StatelessWidget {
         home: Scaffold(
           body: error == null
               ? const Center(child: CircularProgressIndicator())
-              : EmptyState(
-                  icon: Icons.error_outline,
-                  title: 'Could not open the database',
-                  detail: '$error',
-                ),
+              : _StartupError(error!),
         ),
       );
+}
+
+/// The failure screen.
+///
+/// Leads with what is wrong and what to do, and puts the linker trace behind a
+/// disclosure. The trace is the least useful thing on the screen for almost
+/// everyone who will ever see it, and it was previously the only thing.
+class _StartupError extends StatelessWidget {
+  const _StartupError(this.failure);
+
+  final StartupFailure failure;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return SafeArea(
+      child: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                Icons.error_outline,
+                size: 36,
+                color: theme.colorScheme.error,
+              ),
+              const SizedBox(height: 16),
+              Text(failure.headline, style: theme.textTheme.headlineSmall),
+              const SizedBox(height: 12),
+              Text(
+                failure.explanation,
+                style: theme.textTheme.bodyMedium?.copyWith(height: 1.45),
+              ),
+              const SizedBox(height: 20),
+              Theme(
+                data: theme.copyWith(dividerColor: Colors.transparent),
+                child: ExpansionTile(
+                  tilePadding: EdgeInsets.zero,
+                  title: Text(
+                    'Technical detail',
+                    style: theme.textTheme.bodySmall,
+                  ),
+                  children: [
+                    SelectableText(
+                      failure.detail,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        fontFamily: 'monospace',
+                        color: theme.colorScheme.outline,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }

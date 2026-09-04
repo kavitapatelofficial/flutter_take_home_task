@@ -143,6 +143,23 @@ adds the ABIs itself — and neither did `--target-platform android-arm64` on an
 incremental build. The change was reverted rather than left in place looking
 like it worked.
 
+**iOS Simulator does not work, and it took two findings to be sure why.** The
+first launch on a simulator failed with a dlopen trace saying
+`duckdb.framework/duckdb` was not in the bundle. The obvious read is "the
+framework is missing", and it was: the pod's prepare step had left
+`duckdb-framework-ios.zip` sitting unextracted in `ios/Libraries/release/`.
+
+Extracting it would have looked like a fix. Checking the binary before
+declaring victory is what stopped that: `lipo -info` reports a single `arm64`
+slice and `otool -l` reports `LC_VERSION_MIN_IPHONEOS`, meaning it is built for
+physical devices and has no simulator slice at all. Checking every published
+release back to 1.0.1 confirmed none of them ship one.
+
+So there were two independent problems — an unextracted archive that also
+breaks *device* builds, and a framework that fundamentally cannot load on a
+simulator. Reporting only the first would have sent someone chasing a fix that
+could never work.
+
 **The emulator ran out of disk.** The existing Pixel 7 AVD had 537 MB free with
 other projects' apps installed. Rather than delete someone else's apps, a
 dedicated `Bench_Pixel7_API36` AVD was created with a 12 GB data partition.

@@ -18,6 +18,39 @@ The app boots with an empty database, seeds four geofences, and starts a
 simulator that fills the fleet in over the first few seconds. For the full
 500-vehicle dataset, open **Diagnostics → Backfill 500 vehicles**.
 
+### Platform support
+
+| Platform | State |
+|---|---|
+| macOS | Works. Verified. |
+| Android | Works. All device measurements below are from a Pixel 7 API 36 emulator. |
+| iOS device | Should work; **unverified** — no physical device available. |
+| **iOS Simulator** | **Does not work.** Upstream limitation, see below. |
+
+`dart_duckdb` ships a **device-only** iOS framework. Every published release
+back to 1.0.1 contains a single `arm64` slice tagged `LC_VERSION_MIN_IPHONEOS`
+— built for `iphoneos`, with no `iphonesimulator` slice — so there is nothing
+for the simulator's linker to load, even on an Apple Silicon Mac where the
+simulator is also arm64.
+
+Nothing above the storage layer is platform-specific, so this is a packaging
+fact about the dependency rather than anything about the app. Fixing it
+properly means compiling DuckDB for `iphonesimulator` and shipping a real
+`.xcframework` with both slices, which is upstream's job. The app now detects
+this case at boot and says so plainly instead of printing a forty-line linker
+trace.
+
+There is a second, separate iOS trap worth knowing about: the pod's
+`prepare_command` downloads `duckdb-framework-ios.zip` and extracts it, and it
+can leave the archive sitting in `ios/Libraries/release/` **unextracted**. That
+breaks device builds too, with the same "no such file" dlopen error. If you hit
+it:
+
+```bash
+cd ~/.pub-cache/hosted/pub.dev/dart_duckdb-1.2.2/ios/Libraries/release
+unzip -o duckdb-framework-ios.zip
+```
+
 ### Tests
 
 ```bash
@@ -463,3 +496,5 @@ Two other things cost time and are worth knowing:
   input still goes through bound parameters.
 - `at` is a reserved word in DuckDB (`AT TIME ZONE`), and an interval
   constructor will not accept a bound parameter.
+- The iOS framework is device-only in every published release, and the pod's
+  prepare step can leave its archive unextracted. See **Platform support**.

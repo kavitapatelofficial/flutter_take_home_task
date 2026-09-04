@@ -1,5 +1,5 @@
 PODS:
-  - dart_duckdb (1.4.4):
+  - dart_duckdb (1.2.2):
     - FlutterMacOS
   - FlutterMacOS (1.0.0)
 
@@ -14,7 +14,7 @@ EXTERNAL SOURCES:
     :path: Flutter/ephemeral
 
 SPEC CHECKSUMS:
-  dart_duckdb: 6a936ac1b53b289b5bc879bae2627dedaa3c0524
+  dart_duckdb: 94c5fe8f62e39ab7a188c3c6bb36ede7192bd0a5
   FlutterMacOS: d0db08ddef1a9af05a5ec4b724367152bb0500b1
 
 PODFILE CHECKSUM: 54d867c82ac51cbd61b565781b9fada492027009
