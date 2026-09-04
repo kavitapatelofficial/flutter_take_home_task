@@ -136,22 +136,32 @@ class Q {
   ///
   /// A vehicle can sit inside several overlapping fences at once, so "current
   /// geofence" needs a tie-break. We take the smallest active fence
-  /// containing the last fix -- the most specific answer is the useful one,
-  /// since "Depot 3, bay area" tells an operator more than "Bengaluru". Ties
-  /// on radius break on id so the answer never flickers.
+  /// containing its last position -- the most specific answer is the useful
+  /// one, since "North Depot" tells an operator more than "Bengaluru ORR".
+  /// Ties on radius break on id so the answer never flickers.
   ///
-  /// This reads the last fix directly rather than the crossing log, because
-  /// the crossing log deliberately says nothing until a change is confirmed,
-  /// and "where is it" should not lag behind by a confirmation.
+  /// The position comes from the current-state projection, not from the log.
+  /// An earlier version read the last fix out of `location_fixes`, which meant
+  /// pivoting every position row the app had ever stored: on a 2.6M row
+  /// database that was three seconds, and it ran on every app start because
+  /// the geofence seed check asked for the fence list. Reading
+  /// `latest_readings` makes it proportional to the size of the fleet instead
+  /// of the size of its history.
+  ///
+  /// lat and lon are separate rows in that projection and could in principle
+  /// come from different packets. In practice they always travel together in
+  /// one packet and the upsert advances them together, so the pair stays
+  /// coherent; the `event_time` reported is the latitude's.
   static final currentGeofence = r'''
     WITH last_fix AS (
-      SELECT vehicle_id, lat, lon, event_time
-      FROM (
-        SELECT *, row_number() OVER (
-          PARTITION BY vehicle_id ORDER BY event_time DESC, ingest_time DESC
-        ) AS rn
-        FROM location_fixes
-      ) WHERE rn = 1
+      SELECT vehicle_id,
+             max(value)      FILTER (WHERE signal = 'lat') AS lat,
+             max(value)      FILTER (WHERE signal = 'lon') AS lon,
+             max(event_time) FILTER (WHERE signal = 'lat') AS event_time
+      FROM latest_readings
+      WHERE signal IN ('lat', 'lon')
+      GROUP BY vehicle_id
+      HAVING lat IS NOT NULL AND lon IS NOT NULL
     )
     SELECT f.vehicle_id, g.geofence_id, g.name, g.radius_m,
            row_number() OVER (

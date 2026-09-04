@@ -12,7 +12,7 @@ Future<void> seedGeofences(
   GeofenceRepository repo, {
   required DateTime validFrom,
 }) async {
-  if ((await repo.list()).isNotEmpty) return;
+  if (await repo.count() > 0) return;
 
   await repo.create(
     name: 'North Depot',

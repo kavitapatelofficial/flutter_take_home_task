@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
@@ -84,6 +85,10 @@ class AppServices {
       simulator: LiveSimulator(pipeline: pipeline, clock: clock),
       startupMillis: watch.elapsedMilliseconds,
     );
+
+    // Logged as well as shown on the Diagnostics screen, so the cold-start
+    // figure can be read off a device without driving the UI to get at it.
+    debugPrint('boot: database ready in ${watch.elapsedMilliseconds} ms');
 
     return services;
   }

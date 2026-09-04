@@ -60,6 +60,16 @@ class GeofenceRepository {
     ];
   }
 
+  /// Cheap existence check.
+  ///
+  /// Deliberately not `list().isNotEmpty`: that computes vehicle counts, and
+  /// asking for them on every app start is what made startup scan the whole
+  /// position history.
+  Future<int> count() async {
+    final row = await _db.selectOne('SELECT count(*) AS n FROM geofences');
+    return row!['n'] as int;
+  }
+
   Future<String> create({
     required String name,
     required double lat,

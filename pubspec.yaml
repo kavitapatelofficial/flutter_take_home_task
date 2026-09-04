@@ -34,11 +34,22 @@ dependencies:
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
-  dart_duckdb: ^1.2.0
+  # Pinned exactly, and to 1.2.2 rather than the newest 1.4.x.
+  #
+  # dart_duckdb fetches its Android .so at build time from a GitHub release
+  # URL hardcoded in the package's android/build.gradle, and on the 1.4 line
+  # that URL points at releases that were never published: 1.4.4 asks for a
+  # v1.4.4 tag that does not exist, and 1.4.2 asks for v1.4.1, which does not
+  # either. Both fail the Android build with a 404 before compiling a line of
+  # Dart. 1.2.2 points at the v1.2.0 release, whose arm64 and armeabi archives
+  # are actually there, and its Dart API is identical to 1.4.x.
+  #
+  # It bundles DuckDB engine v1.2.1, so tool/fetch_duckdb_native.sh pulls that
+  # same engine for host-side test runs. Tests and device exercise one engine.
+  dart_duckdb: 1.2.2
   path_provider: ^2.1.6
   path: ^1.9.1
   flutter_riverpod: ^2.6.1
-  intl: ^0.20.3
 
 dev_dependencies:
   flutter_test:
@@ -50,6 +61,8 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
+  integration_test:
+    sdk: flutter
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

@@ -7,7 +7,7 @@
 # test/support/duckdb_test_bootstrap.dart).
 set -euo pipefail
 
-VERSION="v1.4.2"   # must match dart_duckdb's vendored version
+VERSION="v1.2.1"   # must match the engine dart_duckdb 1.2.2 vendors
 DEST="$(cd "$(dirname "$0")/.." && pwd)/.native"
 
 case "$(uname -s)-$(uname -m)" in
