@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:math';
 
+import 'package:flutter/foundation.dart';
+
 import '../../core/clock.dart';
 import '../../core/geo.dart';
 import '../ingest/packet.dart';
@@ -134,6 +136,15 @@ class LiveSimulator {
       if (_random.nextInt(12) == 0) packets.add(packet);
     }
 
-    await _pipeline.ingest(packets);
+    if (_timer == null) return;
+    try {
+      await _pipeline.ingest(packets);
+    } catch (error) {
+      // Ingestion can be interrupted if the simulator was stopped or the
+      // database closed during shutdown/restart.
+      if (_timer != null) {
+        debugPrint('LiveSimulator ingestion error: $error');
+      }
+    }
   }
 }

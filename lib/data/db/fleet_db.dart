@@ -31,6 +31,7 @@ class FleetDb {
 
   Future<void> _writeQueue = Future.value();
   bool _closed = false;
+  bool get isClosed => _closed;
 
   /// Points the loader at a DuckDB build on disk.
   ///
@@ -74,15 +75,21 @@ class FleetDb {
     String sql, [
     List<Object?> params = const [],
   ]) async {
-    final result = await _run(sql, params);
+    if (_closed) return [];
     try {
-      final names = result.columnNames;
-      return [
-        for (final row in result.fetchAll())
-          {for (var i = 0; i < names.length; i++) names[i]: row[i]},
-      ];
-    } finally {
-      await result.dispose();
+      final result = await _run(sql, params);
+      try {
+        final names = result.columnNames;
+        return [
+          for (final row in result.fetchAll())
+            {for (var i = 0; i < names.length; i++) names[i]: row[i]},
+        ];
+      } finally {
+        await result.dispose();
+      }
+    } catch (error) {
+      if (_closed) return [];
+      rethrow;
     }
   }
 
@@ -100,12 +107,18 @@ class FleetDb {
     String sql, [
     List<Object?> params = const [],
   ]) async {
-    if (params.isEmpty) {
-      await _con.execute(sql);
-      return;
+    if (_closed) return;
+    try {
+      if (params.isEmpty) {
+        await _con.execute(sql);
+        return;
+      }
+      final result = await _run(sql, params);
+      await result.dispose();
+    } catch (error) {
+      if (_closed) return;
+      rethrow;
     }
-    final result = await _run(sql, params);
-    await result.dispose();
   }
 
   Future<ResultSet> _run(String sql, List<Object?> params) async {
@@ -133,8 +146,19 @@ class FleetDb {
 
   /// Serialises a write transaction against all other writes.
   Future<T> transaction<T>(Future<T> Function() body) {
+    if (_closed) {
+      return Future.error(StateError('This connection has already been closed'));
+    }
     final completer = Completer<T>();
     _writeQueue = _writeQueue.then((_) async {
+      if (_closed) {
+        if (!completer.isCompleted) {
+          completer.completeError(
+            StateError('This connection has already been closed'),
+          );
+        }
+        return;
+      }
       try {
         await _con.execute('BEGIN TRANSACTION');
         try {
@@ -142,12 +166,18 @@ class FleetDb {
           await _con.execute('COMMIT');
           completer.complete(value);
         } catch (error, stack) {
-          await _con.execute('ROLLBACK');
+          if (!_closed) {
+            try {
+              await _con.execute('ROLLBACK');
+            } catch (_) {}
+          }
           completer.completeError(error, stack);
         }
       } catch (error, stack) {
         if (!completer.isCompleted) completer.completeError(error, stack);
       }
+    }).catchError((_) {
+      // Prevent unhandled errors from corrupting future queue chain items.
     });
     return completer.future;
   }
@@ -155,6 +185,9 @@ class FleetDb {
   Future<void> close() async {
     if (_closed) return;
     _closed = true;
+    try {
+      await _writeQueue;
+    } catch (_) {}
     await _con.dispose();
     await _db.dispose();
   }

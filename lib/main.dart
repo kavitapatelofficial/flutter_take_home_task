@@ -62,10 +62,11 @@ class _BootstrapState extends State<_Bootstrap> with WidgetsBindingObserver {
 
     switch (state) {
       case AppLifecycleState.paused:
-      case AppLifecycleState.detached:
       case AppLifecycleState.hidden:
         services.simulator.stop();
         unawaited(services.checkpoint());
+      case AppLifecycleState.detached:
+        services.simulator.stop();
       case AppLifecycleState.resumed:
         services.simulator.start();
       case AppLifecycleState.inactive:
@@ -76,12 +77,16 @@ class _BootstrapState extends State<_Bootstrap> with WidgetsBindingObserver {
   Future<void> _boot() async {
     try {
       final services = await AppServices.boot(since: widget.startup);
+      if (!mounted) {
+        unawaited(services.dispose());
+        return;
+      }
       // A fresh install has an empty fleet, which makes for a poor first
       // impression of a screen whose whole job is showing 500 trucks. The
       // simulator fills it in over the first few seconds; the Diagnostics tab
       // has the button for the full 500-vehicle backfill.
       services.simulator.start();
-      if (mounted) setState(() => _services = services);
+      setState(() => _services = services);
     } catch (error) {
       if (mounted) setState(() => _error = StartupFailure.from(error));
     }

@@ -124,9 +124,15 @@ class AppServices {
   /// Best-effort: if the database is busy or already closing, a failed
   /// checkpoint costs a slower start, not correctness, so it must never take
   /// the app down on the way out.
+  bool _isCheckpointing = false;
+  bool _disposed = false;
+
   Future<void> checkpoint() async {
+    if (db.isClosed || _isCheckpointing) return;
+    _isCheckpointing = true;
     final watch = Stopwatch()..start();
     try {
+      if (db.isClosed) return;
       await db.execute('CHECKPOINT');
       // Only worth a line when it actually cost something; an in-memory
       // database checkpoints in no time and does not need announcing.
@@ -137,10 +143,14 @@ class AppServices {
     } catch (error) {
       debugPrint('checkpoint: failed after ${watch.elapsedMilliseconds} ms: '
           '$error');
+    } finally {
+      _isCheckpointing = false;
     }
   }
 
   Future<void> dispose() async {
+    if (_disposed) return;
+    _disposed = true;
     simulator.stop();
     await checkpoint();
     await pipeline.dispose();

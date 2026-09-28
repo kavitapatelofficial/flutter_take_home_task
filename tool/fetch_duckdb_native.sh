@@ -18,14 +18,25 @@ case "$(uname -s)-$(uname -m)" in
 esac
 
 mkdir -p "$DEST"
-if [ -f "$DEST/libduckdb.dylib" ] || [ -f "$DEST/libduckdb.so" ]; then
+if [ ! -f "$DEST/libduckdb.dylib" ] && [ ! -f "$DEST/libduckdb.so" ]; then
+  echo "Downloading $ASSET ($VERSION)..."
+  curl -fsSL -o "$DEST/duckdb.zip" \
+    "https://github.com/duckdb/duckdb/releases/download/$VERSION/$ASSET"
+  unzip -oq "$DEST/duckdb.zip" -d "$DEST"
+  rm -f "$DEST/duckdb.zip"
+  echo "DuckDB native library ready in $DEST"
+else
   echo "DuckDB native library already present in $DEST"
-  exit 0
 fi
 
-echo "Downloading $ASSET ($VERSION)..."
-curl -fsSL -o "$DEST/duckdb.zip" \
-  "https://github.com/duckdb/duckdb/releases/download/$VERSION/$ASSET"
-unzip -oq "$DEST/duckdb.zip" -d "$DEST"
-rm -f "$DEST/duckdb.zip"
-echo "DuckDB native library ready in $DEST"
+if [[ "$(uname -s)" == "Darwin" ]]; then
+  PUB_DIR="${PUB_CACHE:-$HOME/.pub-cache}/hosted/pub.dev"
+  for plugin_dir in "$PUB_DIR"/dart_duckdb-*; do
+    if [ -d "$plugin_dir/macos" ]; then
+      mkdir -p "$plugin_dir/macos/Libraries/release"
+      cp -f "$DEST/libduckdb.dylib" "$plugin_dir/macos/Libraries/release/libduckdb.dylib"
+      echo "DuckDB native library ready in $plugin_dir/macos/Libraries/release"
+    fi
+  done
+fi
+
